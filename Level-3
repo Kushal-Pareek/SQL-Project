@@ -1,0 +1,87 @@
+/* Level 3
+   -------
+A college needs to develop a system to allocate Open Elective Subjects to its respective 
+students. The way the system would work is that each student is allowed 5 choices with the 
+respective preference, where number 1 indicates the first preference, number 2 indicates 
+second preference and so on, the subjects are supposed to be allotted on the basis of the 
+Student’s GPA, which means the student with the students with the highest GPAs are 
+allotted the subject they want. Every subject has a limited number of seats so if a subject 
+has 60 seats and all of them are filled then the student would not be allotted his first 
+preference but instead second would be checked, if the second preference is full as well 
+then the third preference would be checked, this process would be repeated till the student 
+is allotted a subject of his/her choice. If in case all the preferences that the student has 
+selected are already full, then the student would be considered as unallotted and would be 
+marked so.
+*/
+
+CREATE PROCEDURE ElectiveSubjectAllocation
+AS
+BEGIN
+    -- Delete all the previous allotments and unallotted students from the table.
+    TRUNCATE TABLE Allotments;
+    TRUNCATE TABLE UnallotedStudents;
+
+    -- Iterate through each student
+    DECLARE @StudentID INT;
+    DECLARE @SubjectID VARCHAR(10);
+    DECLARE @Preference INT;
+    DECLARE @GPA DECIMAL(3, 1);
+    DECLARE @RemainingSeats INT;
+
+    DECLARE student_cursor CURSOR FOR
+    SELECT sp.StudentID, sp.SubjectID, sp.Preference, s.GPA
+    FROM StudentPreference sp
+    INNER JOIN StudentDetails s ON sp.StudentID = s.StudentID
+    ORDER BY sp.StudentID, sp.Preference;
+
+    OPEN student_cursor;
+    FETCH NEXT FROM student_cursor INTO @StudentID, @SubjectID, @Preference, @GPA;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        --Check whether the student is already allotted or not.
+        IF NOT EXISTS (SELECT 1 FROM Allotments WHERE StudentID = @StudentID)
+        BEGIN
+            --Choose the subject on the basis of preference and available seats.
+            WHILE @Preference <= 5
+            BEGIN
+                SELECT @RemainingSeats = RemainingSeats
+                FROM SubjectDetails
+                WHERE SubjectID = @SubjectID;
+
+                IF @RemainingSeats > 0
+                BEGIN
+                    INSERT INTO Allotments (SubjectID, StudentID)
+                    VALUES (@SubjectID, @StudentID);
+
+                    UPDATE SubjectDetails
+                    SET RemainingSeats = RemainingSeats - 1
+                    WHERE SubjectID = @SubjectID;
+
+                    BREAK; 
+                END
+
+                -- If the subject is full, then check for the next preference.
+                FETCH NEXT FROM student_cursor INTO @StudentID, @SubjectID, @Preference, @GPA;
+            END
+
+            --If all the preferences are full, then insert  the StudentId in UnallottedStudents table.
+            IF NOT EXISTS (SELECT 1 FROM Allotments WHERE StudentID = @StudentID)
+            BEGIN
+                INSERT INTO UnallotedStudents (StudentID)
+                VALUES (@StudentID);
+            END
+        END
+
+        --Again check for the next student
+        FETCH NEXT FROM student_cursor INTO @StudentID, @SubjectID, @Preference, @GPA;
+    END
+
+    CLOSE student_cursor;
+    DEALLOCATE student_cursor;
+END;
+
+
+
+EXEC ElectiveSubjectAllocation;
+
