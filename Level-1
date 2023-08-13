@@ -1,0 +1,28 @@
+/* Level 1
+   -------
+Write a Stored Procedure that takes table name as input parameter and finds out the name of all the columns in table.
+
+Constraint: You cannot use sp_columns statement.
+*/
+
+CREATE PROCEDURE TableColumnsName
+    @NameOfTable NVARCHAR(50)
+AS
+BEGIN
+    -- Check the table is present in the database or not
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @NameOfTable)
+    BEGIN
+        RAISERROR('Table not found.', 16, 1)
+        RETURN;
+    END
+
+    -- Now select the names of all the columns
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = @NameOfTable
+    ORDER BY ORDINAL_POSITION;
+END;
+
+
+EXEC TableColumnsName @NameOfTable = 'StudentDetails';
+
